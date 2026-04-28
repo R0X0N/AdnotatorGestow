@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Frame Extractor & YT Downloader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/mp4box@0.5.2/dist/mp4box.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+
+<!-- POWIADOMIENIE (TOAST) -->
+<div id="successToast" class="custom-toast">✅ Dodano zakres pomyślnie!</div>
+
+<!-- GÓRNY PASEK -->
+<nav class="navbar yt-navbar px-4 d-flex align-items-center">
+    <span class="navbar-brand text-white fw-bold mb-0">🎬 YT Downloader</span>
+
+    <div class="d-flex gap-2 ms-4 align-items-center">
+        <input type="text" id="ytUrl" class="custom-input" style="width: 300px;" placeholder="Wklej link z YouTube...">
+        <select id="ytRes" class="custom-input" style="width: 90px;">
+            <option value="1080p">1080p</option>
+            <option value="720p">720p</option>
+            <option value="480p">480p</option>
+        </select>
+        <button class="btn-primary-custom" id="ytDownloadBtn" onclick="downloadFromYT()">Pobierz</button>
+
+        <input type="file" id="videoUploader" accept="video/mp4,video/*" style="display: none;">
+        <button class="btn-primary-custom bg-secondary border-0" onclick="document.getElementById('videoUploader').click()">Przeglądaj (Dysk)</button>
+    </div>
+
+    <div class="ms-4 text-light small fw-bold d-flex flex-column" style="line-height: 1.2;">
+        <span id="fileNameDisplay" style="color: #8EB2D6;">Brak wczytanego wideo</span>
+        <span id="fileFpsDisplay" style="color: #A3BE8C;">-- FPS</span>
+    </div>
+
+    <div id="ytStatus" class="ms-3 text-warning fw-bold small flex-grow-1 text-center"></div>
+
+    <button class="btn-primary-custom ms-auto" type="button" data-bs-toggle="offcanvas" data-bs-target="#rangesMenu">
+        ☰ Menu i Eksport
+    </button>
+</nav>
+
+<!-- Pasek Postępu pod Navbarem -->
+<div class="progress bg-dark rounded-0" style="height: 4px; display: none;" id="progressContainer">
+    <div class="progress-bar bg-success progress-bar-striped progress-bar-animated" id="progressBar" style="width: 0%;"></div>
+</div>
+
+<!-- MENU BOCZNE -->
+<div class="offcanvas offcanvas-end custom-offcanvas" tabindex="-1" id="rangesMenu" style="width: 400px; background-color: #282A2E; border-left: 1px solid #383A40;">
+    <div class="offcanvas-header border-bottom border-secondary">
+        <h5 class="title-label m-0 text-white">Zaznaczone Zakresy</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body d-flex flex-column">
+        <div id="rangesList" class="flex-grow-1 overflow-auto mb-3"></div>
+        <div class="mt-auto border-top border-secondary pt-3">
+            <button class="btn btn-outline-success fw-bold w-100 py-2 mb-2 border-2" onclick="saveToServer(false)" id="saveJsonBtn">
+                📝 Zapisz tylko plik JSON
+            </button>
+            <button class="btn-primary-custom w-100 py-2" onclick="saveToServer(true)" id="saveFramesBtn">
+                🎬 Zapisz JSON + Wyodrębnij Klatki
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid px-4 h-100 mt-3 pb-2 content-container">
+    <div class="studio-panel d-flex flex-column h-100">
+
+        <!-- Podgląd wideo -->
+        <div class="video-wrapper mb-2" id="videoWrapper">
+            <video id="videoPlayer" playsinline></video>
+            <div id="processingOverlay">
+                <div class="spinner-border mb-3" style="width: 4rem; height: 4rem; color: #43A047;" role="status"></div>
+                <h4 style="font-weight: bold; color: #A3BE8C;" id="overlayTitle">Przetwarzanie na serwerze...</h4>
+                <span class="text-light-muted mb-4 text-center">Proszę czekać, może to zająć kilka chwil w zależności od długości wycinków.</span>
+            </div>
+        </div>
+
+        <!-- Kontrolki -->
+        <div class="flex-shrink-0 mb-3 mt-1 px-2">
+            <div class="d-flex justify-content-center align-items-center gap-2 mb-2">
+                <button class="btn-skip" onclick="skipFrames(-10)"><span>&lt;&lt;&lt;</span><small>-10</small></button>
+                <button class="btn-skip" onclick="skipFrames(-5)"><span>&lt;&lt;</span><small>-5</small></button>
+                <button class="btn-skip" onclick="skipFrames(-1)"><span>&lt;</span><small>-1</small></button>
+
+                <button class="btn-play mx-3" id="playBtn" onclick="togglePlay()">▶</button>
+
+                <button class="btn-skip" onclick="skipFrames(1)"><span>&gt;</span><small>+1</small></button>
+                <button class="btn-skip" onclick="skipFrames(5)"><span>&gt;&gt;</span><small>+5</small></button>
+                <button class="btn-skip" onclick="skipFrames(10)"><span>&gt;&gt;&gt;</span><small>+10</small></button>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex gap-2" style="width: 150px;">
+                    <button class="btn-io" onclick="setInPoint()" title="Początek (I)">I</button>
+                    <button class="btn-io" onclick="setOutPoint()" title="Koniec (O)">O</button>
+                </div>
+                <div class="d-flex justify-content-center flex-grow-1">
+                    <div class="time-label" id="timeLabel" style="font-size: 14px; padding: 4px 16px;">00:00 / 00:00</div>
+                </div>
+                <div class="text-end" style="width: 150px;">
+                    <div style="color: #A0AAB5; font-family: 'Consolas'; font-size: 14px; font-weight: bold;" id="trimLabel">Klatka: 0</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Oś czasu i Suwaki -->
+        <div class="timeline-container d-flex gap-3 align-items-start flex-shrink-0" style="height: 160px;">
+            <div id="canvasWrapper" style="flex-grow: 1; height: 100%; position: relative;">
+                <canvas id="timelineCanvas"></canvas>
+            </div>
+
+            <div class="controls-right align-items-center" style="width: 260px; height: 160px; display: grid; grid-template-rows: repeat(4, 1fr); gap: 0;">
+                <div class="d-flex align-items-center">
+                    <input type="text" id="gestureWord" class="custom-input w-100" placeholder="Nazwa Główna (Słowo)">
+                </div>
+                <div class="d-flex align-items-center text-light-muted small px-2">Suwak pomocniczy mimiki (opcja)</div>
+
+                <div class="d-flex align-items-center">
+                    <div class="custom-dropdown w-100" id="leftHandDropdown">
+                        <div class="dropdown-selected" onclick="toggleDropdown('leftHandMenu', event)">👐 Lewa dłoń (Wybierz)</div>
+                        <div class="dropdown-menu-custom" id="leftHandMenu" style="display: none;">
+                            <div class="search-box-container">
+                                <input type="text" class="custom-input w-100 search-input" placeholder="Wyszukaj gest..." onkeyup="filterDropdown('leftHandMenu', this.value)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="gesture-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center">
+                    <div class="custom-dropdown w-100" id="rightHandDropdown">
+                        <div class="dropdown-selected" onclick="toggleDropdown('rightHandMenu', event)">👐 Prawa dłoń (Wybierz)</div>
+                        <div class="dropdown-menu-custom" id="rightHandMenu" style="display: none;">
+                            <div class="search-box-container">
+                                <input type="text" class="custom-input w-100 search-input" placeholder="Wyszukaj gest..." onkeyup="filterDropdown('rightHandMenu', this.value)" onclick="event.stopPropagation()">
+                            </div>
+                            <div class="gesture-list"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Przyciski Zapisywania / Edycji -->
+        <div class="text-center mt-3 mb-1 d-flex justify-content-center gap-2">
+            <button class="btn-action px-5 py-2 fs-6" id="actionRangeBtn" onclick="saveCurrentRanges()">➕ Dodaj ułożony zakres</button>
+            <button class="btn btn-outline-secondary py-2" id="cancelEditBtn" onclick="cancelEdit()" style="display: none; font-weight: bold;">❌ Anuluj edycję</button>
+        </div>
+
+    </div>
+</div>
+
+</body>
+</html>
