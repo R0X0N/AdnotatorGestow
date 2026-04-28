@@ -1,5 +1,5 @@
 Flask==3.0.0
-yt-dlp==2023.12.30
+yt-dlp
 numpy<2.0.0
 opencv-python-headless>=4.10.0.84
 google-api-python-client==2.118.0
