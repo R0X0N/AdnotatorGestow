@@ -181,4 +181,5 @@ def process_data():
 
 
 if __name__ == '__main__':
-  app.run(host='0.0.0.0', port=5000)
+    # Usunęliśmy app.run(debug=True) i daliśmy host='0.0.0.0'
+    app.run(host='0.0.0.0', port=5000)
