@@ -1,7 +1,0 @@
-Flask==3.0.0
-yt-dlp==2024.04.10.235301dev0
-numpy<2.0.0
-opencv-python-headless>=4.10.0.84
-google-api-python-client==2.118.0
-google-auth-httplib2==0.2.0
-google-auth-oauthlib==1.2.0
